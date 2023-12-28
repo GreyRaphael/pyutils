@@ -3,7 +3,7 @@ import sys
 
 # sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from log4py import logger
+from pyutils.log4py import logger
 
 for i in range(100):
     logger.debug("Debug message %d" % i)

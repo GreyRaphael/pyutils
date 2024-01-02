@@ -30,7 +30,7 @@ class StockDownloader:
         tasks = [self._fetch_url(url) for url in urls]
         return await asyncio.gather(*tasks)
 
-    def craw_stocks(self, code_list: list[str]) -> list[dict]:
+    def _craw_stocks(self, code_list: list[str]) -> list[dict]:
         urls = []
         for code in code_list:
             market = 1 if code.startswith("6") else 0
@@ -40,13 +40,13 @@ class StockDownloader:
             url = f"http://push2.eastmoney.com/api/qt/stock/get?ut=fa5fd1943c7b386f172d6893dbfba10b&fltt=2&invt=2&volt=2&fields=f152,f288,f43,f57,f58,f169,f170,f46,f44,f51,f168,f47,f164,f116,f60,f45,f52,f50,f48,f167,f117,f71,f161,f49,f530,f135,f136,f137,f138,f139,f141,f142,f144,f145,f147,f148,f140,f143,f146,f149,f55,f62,f162,f92,f173,f104,f105,f84,f85,f183,f184,f185,f186,f187,f188,f189,f190,f191,f192,f107,f111,f86,f177,f78,f110,f262,f263,f264,f267,f268,f250,f251,f252,f253,f254,f255,f256,f257,f258,f266,f269,f270,f271,f273,f274,f275,f127,f199,f128,f198,f259,f260,f261,f171,f277,f278,f279,f31,f32,f33,f34,f35,f36,f37,f38,f39,f40,f20,f19,f18,f17,f16,f15,f14,f13,f12,f11,f531,f59&secid={market}.{code}&cb=jQuery35108346946561699186_{timestamp_start}_={timestamp_end}"
             urls.append(url)
         stock_list = asyncio.run(self._fetch_urls(urls))
-        print("finish ↓ all stockinfo")
+        # print("finish ↓ all stockinfo")
         return stock_list
 
-    def process_stocks(self, raw_list: list[dict]) -> list[dict]:
+    def get_quotes(self, code_list: list[str]) -> list[dict]:
         # filter stockinfo
         stockinfo_list = []
-        for j_data in raw_list:
+        for j_data in self._craw_stocks(code_list):
             stockinfo = {}
             stockinfo["SECUCODE"] = f'{j_data["f57"]}.SH' if j_data["f57"].startswith("6") else f'{j_data["f57"]}.SZ'
             # 最新价
@@ -64,7 +64,9 @@ class StockDownloader:
             # 跌停价
             stockinfo["low_limit"] = j_data["f52"]
             # 涨跌幅
-            stockinfo["f3"] = j_data["f170"]
+            stockinfo["pctchange"] = j_data["f170"]
+            # 涨跌额
+            stockinfo["change"] = j_data["f169"]
             # 卖5~卖1: 挂单价+挂单股数
             stockinfo["offer_prices"] = [
                 j_data["f31"],
@@ -115,6 +117,5 @@ class StockDownloader:
 if __name__ == "__main__":
     example_list = ["000001", "300116", "600022", "688538"]
     obj = StockDownloader()
-    raw_list = obj.craw_stocks(example_list)
-    stockinfo_list = obj.process_stocks(raw_list)
+    stockinfo_list = obj.get_quotes(example_list)
     print(stockinfo_list)

@@ -2,6 +2,7 @@ import asyncio
 import httpx
 import random
 import time
+import csv
 
 
 class StockDownloader:
@@ -113,6 +114,8 @@ class StockDownloader:
             stockinfo_list.append(stockinfo)
         return stockinfo_list
 
+
+class StockProcessor:
     @classmethod
     def seperate(cls, quotes: list[dict], N: int, sort_key: str):
         if sort_key:
@@ -132,11 +135,24 @@ class StockDownloader:
 
         return sz00[:N] + sz30[:N] + sh60[:N] + sh68[:N]
 
+    @classmethod
+    def write_csv(cls, quotes: list[dict], filename: str):
+        if len(quotes) == 0:
+            print("data list is empty!")
+            return
+        colNames = quotes[0].keys()
+        with open(filename, "w", encoding="utf8", newline="") as file:
+            csv_writer = csv.DictWriter(file, fieldnames=colNames)
+            csv_writer.writeheader()
+            csv_writer.writerows(quotes)
+        print(f"write to {filename}")
+
 
 if __name__ == "__main__":
     example_list = ["000001", "300116", "600022", "688538", "600022", "688009", "000961"]
     obj = StockDownloader()
     stockinfo_list = obj.get_quotes(example_list)
     # print(stockinfo_list)
-    result = StockDownloader.seperate(stockinfo_list, 5, "last")
-    print(result)
+    result = StockProcessor.seperate(stockinfo_list, 5, "last")
+    # print(result)
+    StockProcessor.write_csv(result, "stock_info.csv")

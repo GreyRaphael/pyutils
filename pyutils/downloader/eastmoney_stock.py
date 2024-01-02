@@ -113,9 +113,30 @@ class StockDownloader:
             stockinfo_list.append(stockinfo)
         return stockinfo_list
 
+    @classmethod
+    def seperate(cls, quotes: list[dict], N: int, sort_key: str):
+        if sort_key:
+            quotes.sort(key=lambda x: x[sort_key], reverse=False)
+
+        sz00, sz30, sh60, sh68 = [], [], [], []
+        for quote in quotes:
+            secucode = quote["SECUCODE"]
+            if secucode.startswith("0"):
+                sz00.append(quote)
+            elif secucode.startswith("3"):
+                sz30.append(quote)
+            elif secucode.startswith("68"):
+                sh68.append(quote)
+            else:
+                sh60.append(quote)
+
+        return sz00[:N] + sz30[:N] + sh60[:N] + sh68[:N]
+
 
 if __name__ == "__main__":
-    example_list = ["000001", "300116", "600022", "688538"]
+    example_list = ["000001", "300116", "600022", "688538", "600022", "688009", "000961"]
     obj = StockDownloader()
     stockinfo_list = obj.get_quotes(example_list)
-    print(stockinfo_list)
+    # print(stockinfo_list)
+    result = StockDownloader.seperate(stockinfo_list, 5, "last")
+    print(result)

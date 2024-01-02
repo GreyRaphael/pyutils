@@ -3,7 +3,7 @@ import logging
 from logging import handlers
 
 
-def setup_logger(log_name=__name__, log_dir="log", level=logging.DEBUG):
+def get_logger(log_name=__name__, log_dir="log", level=logging.DEBUG):
     os.makedirs(log_dir, exist_ok=True)
 
     # check logger existence
@@ -32,8 +32,8 @@ def setup_logger(log_name=__name__, log_dir="log", level=logging.DEBUG):
 """
 Example: import and use
 
-from log4py import setup_logger
-logger=setup_logger("log_name", "log_dir")
+from log4py import get_logger
+logger=get_logger("log_name", "log_dir")
 
 logger.debug('msg')
 logger.info('msg')
@@ -42,5 +42,5 @@ logger.error('msg')
 """
 
 if __name__ == "__main__":
-    logger = setup_logger(level=logging.DEBUG)
-    logger = setup_logger("dailyEval", "log_dir")
+    logger = get_logger(level=logging.DEBUG)
+    logger = get_logger("dailyEval", "log_dir")

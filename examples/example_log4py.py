@@ -4,9 +4,9 @@ import time
 
 # sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from pyutils.log4py import setup_logger
+from pyutils.log4py import get_logger
 
-logger = setup_logger()
+logger = get_logger()
 
 for i in range(100):
     logger.debug("Debug message %d" % i)

@@ -3,6 +3,7 @@ import random
 import os
 import json
 import csv
+import time
 import httpx
 
 
@@ -88,7 +89,7 @@ class EtfSzDownloader:
     async def _fetch_url(self, url) -> dict:
         response = await self._client.get(url, headers=self._headers, timeout=None)
         print(f"==> {url}")
-        return response.json()
+        return response.text
 
     async def _fetch_urls(self, urls: list):
         tasks = [self._fetch_url(url) for url in urls]
@@ -101,13 +102,23 @@ class EtfSzDownloader:
         url_list = [f"https://www.szse.cn/api/report/ShowReport/data?CATALOGID=1945&tab1PAGENO={i}" for i in range(1, tot_page_num + 1)]
 
         loop = asyncio.get_event_loop()
-        dict_list = loop.run_until_complete(self._fetch_urls(url_list))
+        txt_list = loop.run_until_complete(self._fetch_urls(url_list))
 
         etf_code_list = []
-        for page_dict in dict_list:
-            for record in page_dict[1]["data"]:
+        for txt in txt_list:
+            j_data = json.loads(txt)
+            for record in j_data[1]["data"]:
                 etf_code_list.append(record["fund_code"])
         return etf_code_list
+
+    def _craw_etf_details(self, code_list) -> dict:
+        date_str = time.strftime("%Y%m%d")
+        url_list = [f"http://reportdocs.static.szse.cn/files/text/etf/ETF{code}{date_str}.txt" for code in code_list]
+
+        loop = asyncio.get_event_loop()
+        txt_list = loop.run_until_complete(self._fetch_urls(url_list))
+
+        pass
 
 
 if __name__ == "__main__":

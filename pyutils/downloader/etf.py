@@ -5,6 +5,7 @@ import json
 import csv
 import time
 import httpx
+import re
 
 
 class EtfShDownloader:
@@ -118,7 +119,10 @@ class EtfSzDownloader:
         loop = asyncio.get_event_loop()
         txt_list = loop.run_until_complete(self._fetch_urls(url_list))
 
-        pass
+        pat = re.compile(r" \d{6}.+")
+        for code, txt in zip(code_list, txt_list):
+            for line in pat.findall(txt):
+                line_list = re.split(r"\s+", line)
 
 
 if __name__ == "__main__":

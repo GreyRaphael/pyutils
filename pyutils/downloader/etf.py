@@ -5,6 +5,7 @@ import json
 import csv
 import time
 import httpx
+import xml.etree.ElementTree as ET
 
 
 class EtfShDownloader:
@@ -111,24 +112,70 @@ class EtfSzDownloader:
                 etf_code_list.append(record["fund_code"])
         return etf_code_list
 
+    def _parse_xml(self, xml_str) -> list:
+        xml = ET.fromstring(xml_str)
+        # print(xml.find(".//{http://ts.szse.cn/Fund}SecurityID").text)
+        root = xml.find(".//{http://ts.szse.cn/Fund}Components")
+        instrument_id_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}UnderlyingSecurityID")]
+        length = len(instrument_id_list)
+        quantity_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}ComponentShare")] or [0] * length
+        creation_premium_rate_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}PremiumRatio")] or [0] * length
+        redemption_discount_rate_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}DiscountRatio")] or [0] * length
+        substitution_flag_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}SubstituteFlag")]
+        creation_cash_substitue_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}CreationCashSubstitute")]
+        redemption_cash_substitue_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}RedemptionCashSubstitute")]
+
+        return [
+            {
+                "INSTRUMENT_ID": instrument_id_list[i],
+                "QUANTITY": quantity_list[i],
+                "CREATION_PREMIUM_RATE": creation_premium_rate_list[i],
+                "REDEMPTION_DISCOUNT_RATE": redemption_discount_rate_list[i],
+                "SUBSTITUTION_FLAG": substitution_flag_list[i],
+                "CreationCashSubstitute": creation_cash_substitue_list[i],
+                "RedemptionCashSubstitute": redemption_cash_substitue_list[i],
+            }
+            for i in range(length)
+        ]
+
     def _craw_etf_details(self, code_list) -> dict:
         date_str = time.strftime("%Y%m%d")
-        url_list = [f"http://reportdocs.static.szse.cn/files/text/etf/ETF{code}{date_str}.txt" for code in code_list]
+        url_list = [f"http://reportdocs.static.szse.cn/files/text/ETFDown/pcf_{code}_{date_str}.xml" for code in code_list]
 
         loop = asyncio.get_event_loop()
         txt_list = loop.run_until_complete(self._fetch_urls(url_list))
 
-        pass
+        all_detals = {}
+        for code, txt in zip(code_list, txt_list):
+            all_detals[code] = self._parse_xml(txt)
+        return all_detals
+
+    @classmethod
+    def write_details(cls, directory: str, etf_details: dict):
+        os.makedirs(directory, exist_ok=True)
+        for code in etf_details:
+            data_dict = etf_details[code]
+            # 保留成分股数量<=50
+            if len(data_dict) > 50:
+                continue
+            with open(f"{directory}/{code}.csv", "w", encoding="utf8") as f:
+                fields = ["INSTRUMENT_ID", "QUANTITY", "CREATION_PREMIUM_RATE", "REDEMPTION_DISCOUNT_RATE", "SUBSTITUTION_FLAG", "CreationCashSubstitute", "RedemptionCashSubstitute"]
+                csv_writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+                csv_writer.writeheader()
+                csv_writer.writerows(data_dict)
 
 
 if __name__ == "__main__":
-    # sh_downloader = EtfShDownloader()
-    # etf_code_list = sh_downloader._craw_etf_list()
-    # print("etf length:", len(etf_code_list))
-    # etf_details = sh_downloader._craw_etf_details(etf_code_list)
-    # EtfShDownloader.write_details("sh_etf", etf_details)
-    # print("write_csv done")
+    sh_downloader = EtfShDownloader()
+    etf_code_list = sh_downloader._craw_etf_list()
+    print("etf length:", len(etf_code_list))
+    etf_details = sh_downloader._craw_etf_details(etf_code_list)
+    EtfShDownloader.write_details("sh_etf", etf_details)
+    print("write_csv sh done")
 
     sz_downloader = EtfSzDownloader()
     etf_code_list = sz_downloader._craw_etf_list()
     print("etf length:", len(etf_code_list))
+    etf_details = sz_downloader._craw_etf_details(etf_code_list)
+    EtfSzDownloader.write_details("sz_etf", etf_details)
+    print("write_csv sz done")

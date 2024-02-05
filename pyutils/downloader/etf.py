@@ -106,29 +106,23 @@ class EtfSzDownloader:
     def _parse_xml(self, xml_str) -> list:
         xml = ET.fromstring(xml_str)
         # print(xml.find(".//{http://ts.szse.cn/Fund}SecurityID").text)
-        root = xml.find(".//{http://ts.szse.cn/Fund}Components")
-        instrument_id_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}UnderlyingSecurityID")]
-        length = len(instrument_id_list)
-        quantity_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}ComponentShare")] or [0] * length
-        creation_premium_rate_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}PremiumRatio")] or [0] * length
-        print([ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}DiscountRatio")])
-        redemption_discount_rate_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}DiscountRatio")] or [0] * length
-        substitution_flag_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}SubstituteFlag")]
-        creation_cash_substitue_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}CreationCashSubstitute")]
-        redemption_cash_substitue_list = [ele.text for ele in root.findall(".//{http://ts.szse.cn/Fund}RedemptionCashSubstitute")]
+        components = xml.find(".//{http://ts.szse.cn/Fund}Components")
 
-        return [
-            {
-                "INSTRUMENT_ID": instrument_id_list[i],
-                "QUANTITY": quantity_list[i],
-                "CREATION_PREMIUM_RATE": creation_premium_rate_list[i],
-                "REDEMPTION_DISCOUNT_RATE": redemption_discount_rate_list[i],
-                "SUBSTITUTION_FLAG": substitution_flag_list[i],
-                "CreationCashSubstitute": creation_cash_substitue_list[i],
-                "RedemptionCashSubstitute": redemption_cash_substitue_list[i],
+        result = []
+        for component in components:
+            component_dict = {
+                "UnderlyingSecurityID": None,
+                "ComponentShare": None,
+                "PremiumRatio": None,
+                "DiscountRatio": None,
+                "SubstituteFlag": None,
+                "CreationCashSubstitute": None,
+                "RedemptionCashSubstitute": None,
             }
-            for i in range(length)
-        ]
+            for ele in component:
+                component_dict[ele.tag] = ele.text
+            result.append(component_dict)
+        return result
 
     def _craw_etf_details(self, code_list) -> dict:
         date_str = time.strftime("%Y%m%d")

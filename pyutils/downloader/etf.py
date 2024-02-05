@@ -11,8 +11,8 @@ import re
 
 class EtfShDownloader:
     def __init__(self):
-        self._client = httpx.AsyncClient(limits=httpx.Limits(max_connections=20))
         self._headers = self._generate_headers()
+        self._client = httpx.AsyncClient(headers=self._headers, timeout=None, limits=httpx.Limits(max_connections=20))
 
     def _generate_headers(self) -> dict:
         num = random.randint(90, 120)
@@ -22,7 +22,7 @@ class EtfShDownloader:
         }
 
     async def _fetch_url(self, url) -> dict:
-        response = await self._client.get(url, headers=self._headers, timeout=None)
+        response = await self._client.get(url)
         print(f"==> {url}")
         return response.text
 

@@ -4,9 +4,9 @@ import os
 import json
 import csv
 import time
-import httpx
-import xml.etree.ElementTree as ET
 import re
+import httpx
+from lxml import etree
 
 
 class EtfShDownloader:
@@ -92,37 +92,42 @@ class EtfSzDownloader:
     def _craw_etf_list(self) -> dict:
         """获取ETF代码列表, source: https://www.szse.cn/market/product/list/etfList/"""
         data = self._client.get("https://www.szse.cn/api/report/ShowReport/data?CATALOGID=1945&loading=first").json()
-        tot_page_num = data[1]["metadata"]["pagecount"]
-        txt_list = [self._client.get(f"https://www.szse.cn/api/report/ShowReport/data?CATALOGID=1945&tab1PAGENO={i}").text for i in range(1, tot_page_num + 1)]
+        tot_page_num = data[0]["metadata"]["pagecount"]
+        print("total page num:", tot_page_num)
 
-        etf_codes = set()
-        for txt in txt_list:
-            j_data = json.loads(txt)
+        etf_codes = []
+        for i in range(1, tot_page_num + 1):
+            url = f"https://www.szse.cn/api/report/ShowReport/data?CATALOGID=1945&tab1PAGENO={i}"
+            j_data = self._client.get(url).json()
             for record in j_data[0]["data"]:
                 code = re.match(r".+?code=(\d+)'", record["sys_key"]).group(1)
-                etf_codes.add(code)
+                etf_codes.append(code)
+
+            print("finish", url)
         return etf_codes
 
     def _parse_xml(self, xml_str) -> list:
-        xml = ET.fromstring(xml_str)
-        # print(xml.find(".//{http://ts.szse.cn/Fund}SecurityID").text)
-        components = xml.find(".//{http://ts.szse.cn/Fund}Components")
-
         result = []
+
+        tree = etree.XML(xml_str)
+        components = tree.xpath("//fund:Component", namespaces={"fund": "http://ts.szse.cn/Fund"})
+
         for component in components:
-            component_dict = {
-                "UnderlyingSecurityID": None,
-                "ComponentShare": None,
-                "PremiumRatio": None,
-                "DiscountRatio": None,
-                "SubstituteFlag": None,
-                "CreationCashSubstitute": None,
-                "RedemptionCashSubstitute": None,
-            }
-            for ele in component:
-                component_dict[ele.tag] = ele.text
-            result.append(component_dict)
+            component_dict = {}
+            for element in component:
+                # remove the namespace of element.tag
+                component_dict[etree.QName(element).localname] = element.text
+                result.append(component_dict)
         return result
+
+    def _write_xml(self, code, xml_bytes) -> list:
+        os.makedirs("sz_etf_xml", exist_ok=True)
+        with open(f"sz_etf_xml/{code}.xml", "wb") as f:
+            f.write(xml_bytes)
+
+    def _write_failed(self, code, url) -> list:
+        with open("sz_etf_xml/sz_etf_failed.csv", "a", encoding="utf8") as file:
+            file.write(f"{code}\t{url}\n")
 
     def _craw_etf_details(self, code_list) -> dict:
         date_str = time.strftime("%Y%m%d")
@@ -130,9 +135,15 @@ class EtfSzDownloader:
         all_detals = {}
         for code in code_list:
             url = f"http://reportdocs.static.szse.cn/files/text/ETFDown/pcf_{code}_{date_str}.xml"
-            txt = self._client.get(url).text
-            all_detals[code] = self._parse_xml(txt)
-            time.sleep(0.5)
+            xml_bytes = self._client.get(url).content
+            try:
+                all_detals[code] = self._parse_xml(xml_bytes)
+                self._write_xml(code, xml_bytes)
+                print("finish", url)
+            except Exception as e:
+                print("failed--->", e, url)
+                self._write_failed(code, url)
+            time.sleep(2)
         return all_detals
 
     @classmethod
@@ -144,7 +155,7 @@ class EtfSzDownloader:
             if len(data_dict) > 50:
                 continue
             with open(f"{directory}/{code}.csv", "w", encoding="utf8") as f:
-                fields = ["INSTRUMENT_ID", "QUANTITY", "CREATION_PREMIUM_RATE", "REDEMPTION_DISCOUNT_RATE", "SUBSTITUTION_FLAG", "CreationCashSubstitute", "RedemptionCashSubstitute"]
+                fields = data_dict[0].keys()
                 csv_writer = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
                 csv_writer.writeheader()
                 csv_writer.writerows(data_dict)

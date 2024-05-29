@@ -1,4 +1,4 @@
-import sys
+import argparse
 import json
 import asyncio
 import httpx
@@ -21,23 +21,34 @@ async def fetch_urls(urls: list):
     return await asyncio.gather(*tasks)
 
 
-def download_calendar(year: str, output_dir: str = "."):
+def download_calendar(year: str, out_int: bool, output_dir: str = "."):
     print("↓ trading days of", year)
     urls = [f"http://www.szse.cn/api/report/exchange/onepersistenthour/monthList?month={year}-{i:02d}" for i in range(1, 13)]
     j_data_list = asyncio.run(fetch_urls(urls))
     print("finish ↓ trading days of", year)
 
     # write to json
-    trading_days = [record["jyrq"] for record_list in j_data_list for record in record_list if record["jybz"] == "1"]
+    if out_int:
+        trading_days = [int("".join(record["jyrq"].split("-"))) for record_list in j_data_list for record in record_list if record["jybz"] == "1"]
+    else:
+        trading_days = [record["jyrq"] for record_list in j_data_list for record in record_list if record["jybz"] == "1"]
+
     with open(f"{output_dir}/{year}.json", "w") as file:
-        json.dump(trading_days, file, indent=4)
+        json.dump(trading_days, file, indent=2)
     print("finish writing trading days of", year)
 
 
+def download_calendars(args):
+    for year in range(args.yr_start, args.yr_end + 1):
+        download_calendar(year, args.out_int)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python3 pyutils/downloader/trading_days.py <year>")
-        exit(0)
-    else:
-        year_str = sys.argv[1]
-        download_calendar(year_str)
+    parser = argparse.ArgumentParser(description="download trading days")
+    parser.add_argument("--yr-start", type=int, required=True, help="start year, 2021")
+    parser.add_argument("--yr-end", type=int, required=True, help="end year, 2023")
+    parser.add_argument("--out-int", action="store_true", help="flag, if set 'integer' else 'string'")
+    parser.set_defaults(func=download_calendars)
+
+    args = parser.parse_args()
+    args.func(args)
